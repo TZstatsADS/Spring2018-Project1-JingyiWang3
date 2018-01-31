@@ -1,0 +1,629 @@
+---
+title: "Democrats vs Republicans"
+output:
+  html_document:
+    df_print: paged
+editor_options:
+  chunk_output_type: inline
+---
+
+In this study, I focus on U.S. Presidential inauguration speeches of the recent 8 presidents. Here I conduct a brief comparison of speeches by the parties to which presidents stand for.
+
+```{r,echo = FALSE, warning=FALSE}
+#Load Libraries
+library("tm")
+library("SnowballC")
+library("wordcloud")
+library("rvest")
+library("tibble")
+library("qdap")
+library("sentimentr")
+library("gplots")
+library("dplyr")
+library("tm")
+library("syuzhet")
+library("factoextra")
+library("beeswarm")
+library("scales")
+library("RColorBrewer")
+library("RANN")
+library("tm")
+library("topicmodels")
+library("xlsx")
+library("plotrix")
+library("formattable")
+library("ggplot2")
+```
+
+
+```{r, echo = FALSE, warning=FALSE}
+#Load Speeches
+setwd("/Users/JingyiWang/Google Drive/5243 Data/GitHub")
+
+files <- c("../data/InauguralSpeeches/inaugRichardNixon-1.txt", 
+           "../data/InauguralSpeeches/inaugRichardNixon-2.txt",
+           "../data/InauguralSpeeches/inaugJimmyCarter-1.txt",
+           "../data/InauguralSpeeches/inaugRonaldReagan-1.txt",
+           "../data/InauguralSpeeches/inaugRonaldReagan-2.txt",
+           "../data/InauguralSpeeches/inaugGeorgeBush-1.txt",
+           "../data/InauguralSpeeches/inaugWilliamJClinton-1.txt",
+           "../data/InauguralSpeeches/inaugWilliamJClinton-2.txt",
+           "../data/InauguralSpeeches/inaugGeorgeWBush-1.txt",
+           "../data/InauguralSpeeches/inaugGeorgeWBush-2.txt",
+           "../data/InauguralSpeeches/inaugBarackObama-1.txt",
+           "../data/InauguralSpeeches/inaugBarackObama-2.txt",
+           "../data/InauguralSpeeches/inaugDonaldJTrump-1.txt")
+speech1=paste(readLines(files[1], 
+                  n=-1, skipNul=TRUE),collapse=" ")
+speech2=paste(readLines(files[2], 
+                  n=-1, skipNul=TRUE),collapse=" ")
+
+speech3=paste(readLines(files[3], 
+                  n=-1, skipNul=TRUE),collapse=" ")
+speech4=paste(readLines(files[4], 
+                  n=-1, skipNul=TRUE),collapse=" ")
+speech5=paste(readLines(files[5], 
+                  n=-1, skipNul=TRUE),collapse=" ")
+speech6=paste(readLines(files[6], 
+                  n=-1, skipNul=TRUE),collapse=" ")
+
+speech7=paste(readLines(files[7], 
+                  n=-1, skipNul=TRUE),collapse=" ")
+speech8=paste(readLines(files[8], 
+                  n=-1, skipNul=TRUE),collapse=" ")
+speech9=paste(readLines(files[9], 
+                  n=-1, skipNul=TRUE),collapse=" ")
+speech10=paste(readLines(files[10], 
+                  n=-1, skipNul=TRUE),collapse=" ")
+speech11=paste(readLines(files[11], 
+                  n=-1, skipNul=TRUE),collapse=" ")
+speech12=paste(readLines(files[12], 
+                  n=-1, skipNul=TRUE),collapse=" ")
+
+speech13=paste(readLines(files[13], 
+                  n=-1, skipNul=TRUE),collapse=" ")
+
+
+
+#Full dataframe 
+inaug <- read.csv("../output/InaugurationInfo.csv",stringsAsFactors = FALSE)
+
+inaug$Fulltext <- c(speech1,speech2,speech3,speech4,speech5,speech6,speech7,speech8,
+                    speech9,speech10,speech11,speech12,speech13)
+
+inaug$Words <-word_count(inaug$Fulltext)
+inaug$Date = as.Date(inaug$Date , "%m/%d/%y")
+```
+
+### List of Presidents of the United States from  1969 to 2018
+
+```{r,echo =FALSE,warning=FALSE}
+#Presidents and their parties dataframe 
+President.party<- data.frame(id = 1:8,
+  President = unique(inaug$President),
+                             Presidency =c("1969-1974","1977-1981","1981-1989","1989-1993","1993-2001","2001-2009","2009-2017"," 2017-Incumbent"),
+                             Party = c("Republican","Democratic","Republican","Republican","Democratic","Republican","Democratic","Republican"))
+
+formattable(President.party, list(
+  President = formatter("span", style= style(font.weight = "bold")),
+  Presidency = formatter("span", style = style(font.weight = "bold")),
+  Party = formatter("span", style = x ~ ifelse(x == "Republican", style(color = "#E31A1C", font.weight = "bold"), style(color = "#1F78B4", font.weight = "bold")))
+))
+
+
+
+
+```
+
+
+
+###Length of the Inaugural Addresses
+
+In the recent 40 years, the average number of words used by each president fluctuate between 1200 to 2500, and it seems like the presidents of the Democratic Party delivered slightly shorter speeches. 
+
+Presidents known to have good public-speaking techniques, such as Ronald Reagan and Barack Obama, have long addresses.
+
+```{r,echo = FALSE, warning=FALSE,fig.width = 3, fig.height = 2}
+ave.words = inaug %>% group_by(File) %>% summarise(mean_word = mean(Words))
+President.party$Ave.Words  <- ave.words$mean_word
+President.party$President = factor(President.party$President,levels = President.party$President)
+
+library("ggplot2")
+ ggplot(President.party,aes(fill = Party, y = Ave.Words, x = factor(President))) +
+    geom_bar(position="dodge", stat="identity",width=0.5)+
+   scale_fill_manual(values=c("#1F78B4", "#E31A1C")) + 
+  theme(axis.text.x=element_text(angle=60, hjust=1,color="#993333",face="bold"))+
+  labs(title = "Number of Words of Inaugural Speeches ", x= "President",y  ="Word Count",size = 3) 
+```
+
+
+
+```{r,echo = FALSE, warning=FALSE}
+#Candidates
+rep.candidates <- unique(inaug[inaug$Party == "Republican",]$File)
+dem.candidates <-  unique(inaug[inaug$Party == "Democratic",]$File)
+
+#Seperate dataframe for 2 parties
+rep.df = filter(inaug, File %in% rep.candidates)
+dem.df = filter(inaug, File %in% dem.candidates)
+
+#Seperate speeches
+docs <- Corpus(VectorSource(inaug$Fulltex)) 
+rep.docs<-Corpus(VectorSource(rep.df$Fulltext)) 
+dem.docs<-Corpus(VectorSource(dem.df$Fulltext)) 
+
+#Text Cleaning function 
+
+timeword <- c("mon", "tue", "wed", "fri", "sat", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday", "subject", "sent", "january", "february", "march", "april", "may", "june", "july", "august", "september", "november", "december", "october", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten")
+
+clean <- function(text){
+  text <-tm_map(text,content_transformer(tolower))
+  text <- tm_map(text, removePunctuation)
+  text <- tm_map(text, removeNumbers)
+  text <- tm_map(text, removeWords, stopwords("english"))
+  text <- tm_map(text, stripWhitespace)
+  text <- tm_map(text,stemDocument)
+  text <- tm_map(text, removeWords,c("will","now","can", "may", "upon", "shall", "will","must"))
+  text <- tm_map(text, removeWords,timeword)
+  text <- tm_map(text, content_transformer(function(x) gsub(x, pattern = "us", replacement = "america")))
+  text <- tm_map(text, content_transformer(function(x) gsub(x, pattern = "countri", replacement = "nation")))
+  text <- tm_map(text, content_transformer(function(x) gsub(x, pattern = "respon", replacement = "respons")))
+  text <- tm_map(text, removeWords,c("make","let","live","today","day"))
+  return(text)
+}
+
+docs <- clean(docs)
+rep.docs <- clean(rep.docs)
+dem.docs <- clean(dem.docs)
+
+
+#Make a term-document matrix
+dtm = TermDocumentMatrix(docs)
+rep.dtm <- TermDocumentMatrix(rep.docs)
+dem.dtm <- TermDocumentMatrix(dem.docs)
+
+#Make seperate term matrices for 2 parties
+rep.matrix<- as.matrix(rep.dtm)
+rep.matrix = rep.matrix[order(rowSums(rep.matrix),decreasing=TRUE),]
+rep.wordfreq <- data.frame(terms = rownames(rep.matrix),
+ frequency = rowSums(rep.matrix));rownames(rep.wordfreq) <- 1:nrow(rep.wordfreq)
+
+dem.matrix<- as.matrix(dem.dtm)
+dem.matrix = dem.matrix[order(rowSums(dem.matrix),decreasing=TRUE),]
+dem.wordfreq <- data.frame(terms = rownames(dem.matrix),
+ frequency = rowSums(dem.matrix));rownames(dem.wordfreq) <- 1:nrow(dem.wordfreq)
+
+```
+
+
+### The most frequently used 100 words for presidents of the Republicans Party 
+In the text cleaning process, besides the usual procedure, I manually removed some uninformative words like will, can, and let and replaced some synonyms. 
+
+```{r,echo = FALSE, warning=FALSE,fig.width = 3, fig.height = 1.5}
+library("wordcloud")
+wordcloud(words = rep.wordfreq$terms, freq = rep.wordfreq$frequency, 
+          max.words = 100, colors = brewer.pal(8, "Dark2"), 
+          random.order=FALSE, rot.per=0.35)
+```
+
+### The most frequently used 100 words for presidents of the Democratic Party 
+```{r,echo = FALSE, warning=FALSE,fig.width = 3, fig.height = 1.5}
+library("wordcloud")
+wordcloud(words = dem.wordfreq$terms, freq = dem.wordfreq$frequency, 
+          max.words = 100, colors = brewer.pal(8, "Dark2"), random.order=FALSE, rot.per=0.35, )
+
+```
+
+
+
+# Top 20 Shared Words Used by Presidents of Two Parties
+```{r,echo = FALSE, warning=FALSE,fig.width = 3.5, fig.height = 2}
+all_text <- c(paste(rep.df$Fulltext, collapse = ""), paste(dem.df$Fulltext,collapse = ""))
+all_text <- Corpus(VectorSource(all_text))
+all_text_dtm <-clean(all_text)
+all_text_dtm <- TermDocumentMatrix(all_text_dtm)
+# inspect(all_text_dtm)
+colnames(all_text_dtm) <- c("Republican", "Democratic")
+all_text_matrix <- as.matrix(all_text_dtm)
+
+
+
+shared <- subset(all_text_matrix, all_text_matrix[,1]>=0 &all_text_matrix[,2]>=0)
+#Sort shared words: most common to least common 
+diff <- abs(shared[, 1] - shared[, 2])
+shared_matrix <- cbind(shared, diff)
+shared_matrix <- shared_matrix[order(shared_matrix[, 3],decreasing = TRUE), ]
+shared.top20 <- data.frame(Republican = shared_matrix[1:20, 1],
+                           Democratic = shared_matrix[1:20, 2],
+                           terms = rownames(shared_matrix[1:20, ]))
+
+
+ pyramid.plot(shared.top20$Republican,shared.top20$Democratic, labels = shared.top20$terms,
+ main = "Top 20 Words in Common",space = 0.5, gap = 40,raxlab = NULL, unit = NULL, top.labels = c("Republican","Words","Democratic"))
+
+```
+The most frequently words shared are America, people, world, nation, government, etc. This is expected because inaugural addresses are used to present presidents' visions and goals for the country, their promises to the people, and the missions for the government. Words like peace, freedom are long-term goals that could not be emphasized enough.
+When the presidents look back in history, it seems like they care about aid they received, wins, threatens to lives of the people, and rebuilding the country.
+
+```{r,echo = FALSE}
+cat("Words associated with the word hisotry")
+history <- findAssocs(dtm, terms = "histor", 0.2)$histor[1:10];history
+```
+
+
+### Comparison cloud of top 50 words that appear in speeches from one party but not the other
+
+```{r,echo = FALSE, warning=FALSE,fig.width = 3, fig.height = 1.5}
+comparison.cloud(all_text_matrix,
+ colors = c("#E31A1C", "#1F78B4"),
+ max.words = 50)
+```
+Code from https://s3.amazonaws.com/assets.datacamp.com/production/course_935/ch2_pdf_slides.pdf
+
+
+```{r,echo = FALSE, warning = FALSE}
+#Let's look at frequent term  for 2 parties
+rep.frequent.terms <- freq_terms(rep.docs,
+           top= 55, 
+          at.lease = 10,
+          stopwords = "Top200Words")
+dem.frequent.terms <- freq_terms(dem.docs,
+           top= 50, 
+          at.lease = 10,
+          stopwords = "Top200Words")
+rep.only <- setdiff(rep.frequent.terms$WORD,dem.frequent.terms$WORD);rep.only
+dem.only <- setdiff(dem.frequent.terms$WORD,rep.frequent.terms$WORD);dem.only
+dem.only = dem.only[-c(27)]
+unique <-matrix(NA, nrow = 2, ncol = 27)
+unique[1,] = c("Republican",rep.only)
+unique[2,] = c("Democratic",dem.only)
+unique = data.frame(unique)
+colnames(unique) = c("Party",1:26)
+
+
+formattable(unique, list(
+  Party = formatter("span", style = x ~ ifelse(x == "Republican", style(color = "#E31A1C", font.weight = "bold"), style(color = "#1F78B4", font.weight = "bold")))
+))
+
+
+
+```
+We took a look at the words, it seems like presidents from parties differ greatly in their philosophies. 
+
+Presidents from the Democratic party talks more about equality & health care, children land issues, whereas presidents from the Republican party talks more about freedom, housing policies, state, and union.
+
+
+
+#### Closer look at some ambiguous words and its syntax
+For presidents of the Republicanr Party, the word "never" which is associated with negative sentiments is related to  immigration.
+
+For presidents of the Democratic Party, the word "future"  is associated with dignity and school.
+```{r,echo = FALSE,warnings = FALSE}
+#Find Frequent words and their associations
+never <- findAssocs(rep.dtm, terms = "never", 0.2)$never[1:10]
+never.df <- data.frame(t(matrix(names(never))))
+colnames(never.df) = 1:10
+
+
+formattable(never.df, color = "red")
+```
+
+```{r,echo = FALSE,warnings = FALSE}
+futur <- findAssocs(dem.dtm, terms = "futur", 0.2)$futur[1:10];futur
+futur.df <- data.frame(t(matrix(names(futur))))
+colnames(futur.df) = 1:10
+formattable(futur.df, color = "red")
+```
+
+
+### Democrats vs Republicans: Topics of Inaugural Addresses
+We study how often presidents address 7 topics: Economy , Equality, Misc, Legislation, Government, Reform,Freedom. And it seems like there is only subtle difference between parties.
+Finally we look at a correlation plot of the topics Inaugural Addresses , and it's obvious that topics change over years, and the presidents in the recent years deliever similar topics. 
+Topics of President Donald Trump is very different from the other presidents.
+
+
+```{r, message=FALSE, warning=FALSE}
+vpackages.used=c("rvest", "tibble", "qdap", 
+                "sentimentr", "gplots", "dplyr",
+                "tm", "syuzhet", "factoextra", 
+                "beeswarm", "scales", "RColorBrewer",
+                "RANN", "tm", "topicmodels")
+
+# check packages that need to be installed.
+packages.needed=setdiff(packages.used, 
+                        intersect(installed.packages()[,1], 
+                                  packages.used))
+# install additional packages
+if(length(packages.needed)>0){
+  install.packages(packages.needed, dependencies = TRUE)
+}
+
+# load packages
+library("rvest")
+library("tibble")
+library("topicmodels")
+source("/Users/JingyiWang/Google Drive/5243 Data/GitHub/data/wk2-TextMining/lib/plotstacked.R")
+source("/Users/JingyiWang/Google Drive/5243 Data/GitHub/data/wk2-TextMining/lib/speechFuncs.R")
+
+main.page <- read_html(x = "http://www.presidency.ucsb.edu/inaugurals.php")
+inaug=f.speechlinks(main.page)
+inaug=inaug[-nrow(inaug),] # remove the last line, irrelevant due to error.
+main.page=read_html("http://www.presidency.ucsb.edu/nomination.php")
+nomin <- f.speechlinks(main.page)
+nomin <- nomin[-47,]
+main.page=read_html("http://www.presidency.ucsb.edu/farewell_addresses.php")
+farewell <- f.speechlinks(main.page)
+
+inaug.list=read.csv("/Users/JingyiWang/Google Drive/5243 Data/GitHub/data/wk2-TextMining/data/inauglist.csv", stringsAsFactors = FALSE)
+nomin.list=read.csv("/Users/JingyiWang/Google Drive/5243 Data/GitHub/data/wk2-TextMining/data/nominlist.csv", stringsAsFactors = FALSE)
+farewell.list=read.csv("/Users/JingyiWang/Google Drive/5243 Data/GitHub/data/wk2-TextMining/data/farewelllist.csv", stringsAsFactors = FALSE)
+
+speech.list=rbind(inaug.list, nomin.list, farewell.list)
+speech.list$type=c(rep("inaug", nrow(inaug.list)),
+                   rep("nomin", nrow(nomin.list)),
+                   rep("farewell", nrow(farewell.list)))
+speech.url=rbind(inaug, nomin, farewell)
+speech.list=cbind(speech.list, speech.url)
+
+# Loop over each row in speech.list
+speech.list$fulltext=NA
+for(i in seq(nrow(speech.list))) {
+  text <- read_html(speech.list$urls[i]) %>% # load the page
+    html_nodes(".displaytext") %>% # isloate the text
+    html_text() # get the text
+  speech.list$fulltext[i]=text
+  # Create the file name
+  filename <- paste0("/Users/JingyiWang/Google Drive/5243 Data/GitHub/data/wk2-TextMining/data/fulltext/", 
+                     speech.list$type[i],
+                     speech.list$File[i], "-", 
+                     speech.list$Term[i], ".txt")
+  sink(file = filename) %>% # open file to write 
+  cat(text)  # write the file
+  sink() # close the file
+}
+
+colnames(speech.list)[1] = "President"
+speech1=paste(readLines("/Users/JingyiWang/Google Drive/5243 Data/GitHub/data/wk2-TextMining/data/fulltext/SpeechDonaldTrump-NA.txt", 
+                  n=-1, skipNul=TRUE),
+              collapse=" ")
+speech2=paste(readLines("/Users/JingyiWang/Google Drive/5243 Data/GitHub/data/wk2-TextMining/data/fulltext/SpeechDonaldTrump-NA2.txt", 
+                  n=-1, skipNul=TRUE),
+              collapse=" ")
+speech3=paste(readLines("/Users/JingyiWang/Google Drive/5243 Data/GitHub/data/wk2-TextMining/data/fulltext/PressDonaldTrump-NA.txt", 
+                  n=-1, skipNul=TRUE),
+              collapse=" ")
+
+Trump.speeches=data.frame(
+  President=rep("Donald J. Trump", 3),
+  File=rep("DonaldJTrump", 3),
+  Term=rep(0, 3),
+  Party=rep("Republican", 3),
+  Date=c("August 31, 2016", "September 7, 2016", "January 11, 2017"),
+  Words=c(word_count(speech1), word_count(speech2), word_count(speech3)),
+  Win=rep("yes", 3),
+  type=rep("speeches", 3),
+  links=rep(NA, 3),
+  urls=rep(NA, 3),
+  fulltext=c(speech1, speech2, speech3)
+)
+
+colnames(speech.list)[1] = "President"
+speech.list=rbind(speech.list, Trump.speeches)
+
+
+# Step 4: data Processing --- generate list of sentences
+
+
+sentence.list=NULL
+for(i in 1:nrow(speech.list)){
+  sentences=sent_detect(speech.list$fulltext[i],
+                        endmarks = c("?", ".", "!", "|",";"))
+  if(length(sentences)>0){
+    emotions=get_nrc_sentiment(sentences)
+    word.count=word_count(sentences)
+    # colnames(emotions)=paste0("emo.", colnames(emotions))
+    # in case the word counts are zeros?
+    emotions=diag(1/(word.count+0.01))%*%as.matrix(emotions)
+    sentence.list=rbind(sentence.list, 
+                        cbind(speech.list[i,-ncol(speech.list)],
+                              sentences=as.character(sentences), 
+                              word.count,
+                              emotions,
+                              sent.id=1:length(sentences)
+                              )
+    )
+  }
+}
+
+sentence.list=
+  sentence.list%>%
+  filter(!is.na(word.count)) 
+
+corpus.list=sentence.list[2:(nrow(sentence.list)-1), ]
+sentence.pre=sentence.list$sentences[1:(nrow(sentence.list)-2)]
+sentence.post=sentence.list$sentences[3:(nrow(sentence.list)-1)]
+corpus.list$snipets=paste(sentence.pre, corpus.list$sentences, sentence.post, sep=" ")
+rm.rows=(1:nrow(corpus.list))[corpus.list$sent.id==1]
+rm.rows=c(rm.rows, rm.rows-1)
+corpus.list=corpus.list[-rm.rows, ]
+
+
+
+docs <- Corpus(VectorSource(corpus.list$snipets))
+#remove potentially problematic symbols
+docs <-tm_map(docs,content_transformer(tolower))
+#remove punctuation
+docs <- tm_map(docs, removePunctuation)
+#Strip digits
+docs <- tm_map(docs, removeNumbers)
+#remove stopwords
+docs <- tm_map(docs, removeWords, stopwords("english"))
+#remove whitespace
+docs <- tm_map(docs, stripWhitespace)
+#Stem document
+docs <- tm_map(docs,stemDocument)
+
+
+#LDA
+dtm <- DocumentTermMatrix(docs)
+rownames(dtm) <- paste(corpus.list$type, corpus.list$File,
+                       corpus.list$Term, corpus.list$sent.id, sep="_")
+
+rowTotals <- apply(dtm , 1, sum) #Find the sum of words in each Document
+
+dtm  <- dtm[rowTotals> 0, ]
+corpus.list=corpus.list[rowTotals>0, ]
+
+#run LDA
+#Set parameters for Gibbs sampling
+burnin <- 4000
+iter <- 2000
+thin <- 500
+seed <-list(2003,5,63,100001,765)
+nstart <- 5
+best <- TRUE
+
+#Number of topics
+k <- 15
+
+#Run LDA using Gibbs sampling
+ldaOut <-LDA(dtm, k, method="Gibbs", control=list(nstart=nstart, 
+                                                 seed = seed, best=best,
+                                                 burnin = burnin, iter = iter, 
+                                                 thin=thin))
+#write out results
+#docs to topics
+ldaOut.topics <- as.matrix(topics(ldaOut))
+table(c(1:k, ldaOut.topics))
+write.csv(ldaOut.topics,file=paste("/Users/JingyiWang/Google Drive/5243 Data/GitHub/data/wk2-TextMining/out/LDAGibbs",k,"DocsToTopics.csv"))
+
+#top 6 terms in each topic
+ldaOut.terms <- as.matrix(terms(ldaOut,20))
+write.csv(ldaOut.terms,file=paste("/Users/JingyiWang/Google Drive/5243 Data/GitHub/data/wk2-TextMining/out/LDAGibbs",k,"TopicsToTerms.csv"))
+
+#probabilities associated with each topic assignment
+topicProbabilities <- as.data.frame(ldaOut@gamma)
+write.csv(topicProbabilities,file=paste("/Users/JingyiWang/Google Drive/5243 Data/GitHub/data/wk2-TextMining/out/LDAGibbs",k,"TopicProbabilities.csv"))
+
+terms.beta=ldaOut@beta
+terms.beta=scale(terms.beta)
+topics.terms=NULL
+for(i in 1:k){
+  topics.terms=rbind(topics.terms, ldaOut@terms[order(terms.beta[i,], decreasing = TRUE)[1:7]])
+}
+
+topics.hash=c("Economy", "America", "Defense", "Belief", "Election", "Patriotism", "Unity", "Government", "Reform", "Temporal", "WorkingFamilies", "Freedom", "Equality", "Misc", "Legislation")
+corpus.list$ldatopic=as.vector(ldaOut.topics)
+corpus.list$ldahash=topics.hash[ldaOut.topics]
+
+colnames(topicProbabilities)=topics.hash
+corpus.list.df=cbind(corpus.list, topicProbabilities)
+
+
+topic.plot=c(1, 13, 14, 15, 8, 9, 12)
+
+speech.df=tbl_df(corpus.list.df)%>%filter(File=="RonaldReagan", type=="inaug")%>%select(sent.id, Economy:Legislation)
+speech.df=as.matrix(speech.df)
+speech.df[,-1]=replace(speech.df[,-1], speech.df[,-1]<1/15, 0.001)
+speech.df[,-1]=f.smooth.topic(x=speech.df[,1], y=speech.df[,-1])
+#plot.stacked(speech.df[,1], speech.df[,topic.plot+1],
+    #         xlab="Sentences", ylab="Topic share", main="Ronald Reagan, Inaugural #Speeches")
+
+speech.df=tbl_df(corpus.list.df)%>%filter(File=="RichardNixon", type=="inaug")%>%select(sent.id, Economy:Legislation)
+speech.df=as.matrix(speech.df)
+speech.df[,-1]=replace(speech.df[,-1], speech.df[,-1]<1/15, 0.001)
+speech.df[,-1]=f.smooth.topic(x=speech.df[,1], y=speech.df[,-1])
+#plot.stacked(speech.df[,1], speech.df[,topic.plot+1],
+       #      xlab="Sentences", ylab="Topic share", main="Richard Nixon, Inaugural #Speeches")
+
+speech.df=tbl_df(corpus.list.df)%>%filter(File=="JimmyCarter", type=="inaug")%>%select(sent.id, Economy:Legislation)
+speech.df=as.matrix(speech.df)
+speech.df[,-1]=replace(speech.df[,-1], speech.df[,-1]<1/15, 0.001)
+speech.df[,-1]=f.smooth.topic(x=speech.df[,1], y=speech.df[,-1])
+#plot.stacked(speech.df[,1], speech.df[,topic.plot+1],
+ #            xlab="Sentences", ylab="Topic share", main="JimmyCarter, Inaugural #Speeches")
+
+
+speech.df=tbl_df(corpus.list.df)%>%filter(File=="GeorgeBush", type=="inaug")%>%select(sent.id, Economy:Legislation)
+speech.df=as.matrix(speech.df)
+speech.df[,-1]=replace(speech.df[,-1], speech.df[,-1]<1/15, 0.001)
+speech.df[,-1]=f.smooth.topic(x=speech.df[,1], y=speech.df[,-1])
+#plot.stacked(speech.df[,1], speech.df[,topic.plot+1],
+       #      xlab="Sentences", ylab="Topic share", main="GeorgeBush, Inaugural #Speeches")
+
+speech.df=tbl_df(corpus.list.df)%>%filter(File=="DonaldJTrump", type=="inaug")%>%select(sent.id, Economy:Legislation)
+speech.df=as.matrix(speech.df)
+speech.df[,-1]=replace(speech.df[,-1], speech.df[,-1]<1/15, 0.001)
+speech.df[,-1]=f.smooth.topic(x=speech.df[,1], y=speech.df[,-1])
+plot.stacked(speech.df[,1], speech.df[,topic.plot+1],
+             xlab="Sentences", ylab="Topic share", main="GeorgeBush, Inaugural Speeches")
+
+		
+
+topic.plot=c(1, 13, 14, 15, 8, 9, 12)
+print(topics.hash[topic.plot])
+
+
+d1 <- c(0.07495256, 0.14990513, 0.22485769, 0.29981026 ,0.37476282, 0.44971538, 0.52466795)
+d2 <-c( 0.05862887,0.11725773,0.17588660,0.23451546,0.29314433,0.35177319,0.41040206)
+d3 <-c(0.06260737, 0.12521474, 0.18782211, 0.25042948, 0.31303685, 0.37564422, 0.43825159)
+d4 <-c(0.05993666,0.11987332, 0.17980997, 0.23974663, 0.29968329, 0.35961995, 0.41955660)
+d5 <-c(0.07058961, 0.14117922, 0.21176883 ,0.28235843, 0.35294804 ,0.42353765, 0.49412726)
+d6 <- c( 0.07222845, 0.14445690 ,0.21668535, 0.28891379, 0.36114224, 0.43337069, 0.50559914)
+d7 <-c(0.0700362, 0.1400724, 0.2101086, 0.2801448 ,0.3501810, 0.4202172, 0.4902534)
+
+d8 <-c(0.05991123, 0.11982247 ,0.17973370, 0.23964494 ,0.29955617, 0.35946741, 0.41937864)
+
+
+a = matrix(NA, nrow = 8,ncol = 7)
+a[1,] = d1;a[2,] = d2 ;a[3,] = d3  ;a[4,] = d4  ;a[5,] = d5  ;a[6,] = d6  ;a[7,] = d7 ;a[8,] = d8  
+
+topicdf = data.frame(a)
+
+topic.plot=c(1, 13, 14, 15, 8, 9, 12)
+
+colnames(topicdf) = topics.hash[topic.plot]
+rownames(topicdf) = unique(inaug$File)
+topicdf$Party = c("Republican","Democratic","Republican","Republican","Democratic","Republican","Democratic","Republican")
+
+
+
+
+topicdf2 <- topicdf %>% group_by(Party) %>% summarise_each(funs(mean))
+new = c(topicdf2$Economy,topicdf2$Equality,topicdf2$Misc,topicdf2$Legislation,topicdf2$Government,topicdf2$Reform,topicdf2$Freedom)
+
+
+topicdf3 = data.frame(value  = new,type = rep(topics.hash[topic.plot], each = 2),
+                      Party = rep(c("Republican", "Democratic"),7))
+
+
+library("ggplot2")
+
+ ggplot(topicdf3,aes(fill = Party, y = value, x = factor(type))) +
+    geom_bar(position="dodge", stat="identity",width=0.5)+
+   scale_fill_manual(values=c("#1F78B4", "#E31A1C")) + 
+  theme(axis.text.x=element_text(angle=60, hjust=1,color="#993333",face="bold"))+
+  labs(title = "Average frequency presidents adresses topics ", x= "Topics",size = 3) 
+```
+
+```{r echo = FALSE}
+presid.summary=tbl_df(corpus.list.df)%>%
+  filter(type=="inaug", File%in%sel.comparison)%>%
+  select(File, Economy:Legislation)%>%
+  group_by(File)%>%
+  summarise_each(funs(mean))
+
+presid.summary=as.data.frame(presid.summary)
+rownames(presid.summary)=as.character((presid.summary[,1]))
+km.res=kmeans(scale(presid.summary[,-1]), iter.max=200,
+              5)
+fviz_cluster(km.res, 
+             stand=T, repel= TRUE,
+             data = presid.summary[,-1],
+             show.clust.cent=FALSE)
+```
+
+
+
+
+
