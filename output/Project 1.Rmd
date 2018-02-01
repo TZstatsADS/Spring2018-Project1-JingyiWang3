@@ -7,6 +7,7 @@ editor_options:
   chunk_output_type: inline
 ---
 
+
 In this study, I focus on U.S. Presidential inauguration speeches of 8 presidents in the recent 50 years . Here I conduct a brief comparison of speeches by the parties to which the presidents stand for. I am interested in the similarities and the difference of the speeches in terms of length and content.
 
 ```{r,echo = FALSE, warning=FALSE}
@@ -103,7 +104,7 @@ President.party<- data.frame(id = 1:8,
   President = unique(inaug$President),
                              Presidency =c("1969-1974","1977-1981","1981-1989","1989-1993","1993-2001","2001-2009","2009-2017"," 2017-Incumbent"),
                              Party = c("Republican","Democratic","Republican","Republican","Democratic","Republican","Democratic","Republican"))
-
+library("formattable")
 formattable(President.party, list(
   President = formatter("span", style= style(font.weight = "bold")),
   Presidency = formatter("span", style = style(font.weight = "bold")),
@@ -263,30 +264,27 @@ Code from https://s3.amazonaws.com/assets.datacamp.com/production/course_935/ch2
 
 ```{r,echo = FALSE, warning = FALSE}
 #Let's look at frequent term  for 2 parties
+set.seed(15)
 rep.frequent.terms <- freq_terms(rep.docs,
-           top= 50, 
+           top= 55, 
           at.lease = 10,
           stopwords = "Top200Words")
+set.seed(15)
 dem.frequent.terms <- freq_terms(dem.docs,
            top= 50, 
           at.lease = 10,
           stopwords = "Top200Words")
-rep.only <- setdiff(rep.frequent.terms$WORD,dem.frequent.terms$WORD);rep.only
-dem.only <- setdiff(dem.frequent.terms$WORD,rep.frequent.terms$WORD);dem.only
-rep.only = rep.only[-c(29,28,27)]
-unique <-matrix(NA, nrow = 2, ncol = 29)
-unique[1,] = c("Republican",rep.only)
-unique[2,] = c("Democratic",dem.only)
-unique = data.frame(unique)
-colnames(unique) = c("Party",1:28)
+
+rep.only <- setdiff(rep.frequent.terms$WORD,dem.frequent.terms$WORD)
+dem.only <- setdiff(dem.frequent.terms$WORD,rep.frequent.terms$WORD)
+dem.only <- dem.only[-c(7,12,8,11,15,17,18,27,28,29)]
 
 
-formattable(unique, list(
-  Party = formatter("span", style = x ~ ifelse(x == "Republican", style(color = "#E31A1C", font.weight = "bold"), style(color = "#1F78B4", font.weight = "bold")))
-))
+cat("Republican: ",rep.only)
+```
 
-
-
+```{r,echo = FALSE}
+cat("Democratic: ",dem.only)
 ```
 It seems like presidents from different parties differ in philosophies. Presidents from the Democratic Party talk more about equality & health care, children land issues. Whereas presidents from the Republican party talks more about freedom, housing policies, state, and union. The findings matche two parties' long term ideology. 
 
@@ -298,18 +296,12 @@ For presidents of the Democratic Party, the word "future"  is associated with di
 ```{r,echo = FALSE,warnings = FALSE}
 #Find Frequent words and their associations
 never <- findAssocs(rep.dtm, terms = "never", 0.2)$never[1:10]
-never.df <- data.frame(t(matrix(names(never))))
-colnames(never.df) = 1:10
-
-
-formattable(never.df, color = "red")
+never
 ```
 
 ```{r,echo = FALSE,warnings = FALSE}
 futur <- findAssocs(dem.dtm, terms = "futur", 0.2)$futur[1:10];futur
-futur.df <- data.frame(t(matrix(names(futur))))
-colnames(futur.df) = 1:10
-formattable(futur.df, color = "red")
+
 ```
 
 
@@ -517,26 +509,12 @@ corpus.list.df=cbind(corpus.list, topicProbabilities)
 
 topic.plot=c(1, 13, 14, 15, 8, 9, 12)
 
-speech.df=tbl_df(corpus.list.df)%>%filter(File=="RonaldReagan", type=="inaug")%>%select(sent.id, Economy:Legislation)
-speech.df=as.matrix(speech.df)
-speech.df[,-1]=replace(speech.df[,-1], speech.df[,-1]<1/15, 0.001)
-speech.df[,-1]=f.smooth.topic(x=speech.df[,1], y=speech.df[,-1])
-#plot.stacked(speech.df[,1], speech.df[,topic.plot+1],
-    #         xlab="Sentences", ylab="Topic share", main="Ronald Reagan, Inaugural #Speeches")
-
-speech.df=tbl_df(corpus.list.df)%>%filter(File=="RichardNixon", type=="inaug")%>%select(sent.id, Economy:Legislation)
-speech.df=as.matrix(speech.df)
-speech.df[,-1]=replace(speech.df[,-1], speech.df[,-1]<1/15, 0.001)
-speech.df[,-1]=f.smooth.topic(x=speech.df[,1], y=speech.df[,-1])
-#plot.stacked(speech.df[,1], speech.df[,topic.plot+1],
-       #      xlab="Sentences", ylab="Topic share", main="Richard Nixon, Inaugural #Speeches")
-
 speech.df=tbl_df(corpus.list.df)%>%filter(File=="JimmyCarter", type=="inaug")%>%select(sent.id, Economy:Legislation)
 speech.df=as.matrix(speech.df)
 speech.df[,-1]=replace(speech.df[,-1], speech.df[,-1]<1/15, 0.001)
 speech.df[,-1]=f.smooth.topic(x=speech.df[,1], y=speech.df[,-1])
-#plot.stacked(speech.df[,1], speech.df[,topic.plot+1],
- #            xlab="Sentences", ylab="Topic share", main="JimmyCarter, Inaugural #Speeches")
+plot.stacked(speech.df[,1], speech.df[,topic.plot+1],
+             xlab="Sentences", ylab="Topic share", main="JimmyCarter, Inaugural #Speeches")
 
 
 speech.df=tbl_df(corpus.list.df)%>%filter(File=="GeorgeBush", type=="inaug")%>%select(sent.id, Economy:Legislation)
@@ -558,7 +536,7 @@ plot.stacked(speech.df[,1], speech.df[,topic.plot+1],
 topic.plot=c(1, 13, 14, 15, 8, 9, 12)
 print(topics.hash[topic.plot])
 
-
+#These number are calculated by using above plot.stacked function, d1-d8 represents 8 presidents in chronical order 
 d1 <- c(0.07495256, 0.14990513, 0.22485769, 0.29981026 ,0.37476282, 0.44971538, 0.52466795)
 d2 <-c( 0.05862887,0.11725773,0.17588660,0.23451546,0.29314433,0.35177319,0.41040206)
 d3 <-c(0.06260737, 0.12521474, 0.18782211, 0.25042948, 0.31303685, 0.37564422, 0.43825159)
@@ -566,7 +544,6 @@ d4 <-c(0.05993666,0.11987332, 0.17980997, 0.23974663, 0.29968329, 0.35961995, 0.
 d5 <-c(0.07058961, 0.14117922, 0.21176883 ,0.28235843, 0.35294804 ,0.42353765, 0.49412726)
 d6 <- c( 0.07222845, 0.14445690 ,0.21668535, 0.28891379, 0.36114224, 0.43337069, 0.50559914)
 d7 <-c(0.0700362, 0.1400724, 0.2101086, 0.2801448 ,0.3501810, 0.4202172, 0.4902534)
-
 d8 <-c(0.05991123, 0.11982247 ,0.17973370, 0.23964494 ,0.29955617, 0.35946741, 0.41937864)
 
 
@@ -578,13 +555,16 @@ topicdf = data.frame(a)
 topic.plot=c(1, 13, 14, 15, 8, 9, 12)
 
 colnames(topicdf) = topics.hash[topic.plot]
-rownames(topicdf) = unique(inaug$File)
+president.list = c("RichardNixon" ,"JimmyCarter" ,"RonaldReagan" ,   "GeorgeBush","WilliamJClinton", "GeorgeWBush",   "BarackObama","DonaldJTrump")
+rownames(topicdf) = president.list
 topicdf$Party = c("Republican","Democratic","Republican","Republican","Democratic","Republican","Democratic","Republican")
 
 
 
 
 topicdf2 <- topicdf %>% group_by(Party) %>% summarise_each(funs(mean))
+colnames(topicdf2)<- c("Party",topics.hash[topic.plot])
+
 new = c(topicdf2$Economy,topicdf2$Equality,topicdf2$Misc,topicdf2$Legislation,topicdf2$Government,topicdf2$Reform,topicdf2$Freedom)
 
 
@@ -626,6 +606,7 @@ fviz_cluster(km.res,
              data = presid.summary[,-1],
              show.clust.cent=FALSE)
 ```
+
 ###Conclusion
 For the 8 recent presidents, their inaugural speeches cover very similar topics but still differ by party. And when we take a closer look at the words presidents used in speeches, it seems like the contents differ by parties and match the party's ideologies. 
 
