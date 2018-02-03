@@ -264,12 +264,12 @@ Code from https://s3.amazonaws.com/assets.datacamp.com/production/course_935/ch2
 
 ```{r,echo = FALSE, warning = FALSE}
 #Let's look at frequent term  for 2 parties
-set.seed(15)
+set.seed(1)
 rep.frequent.terms <- freq_terms(rep.docs,
-           top= 55, 
+           top= 60, 
           at.lease = 10,
           stopwords = "Top200Words")
-set.seed(15)
+set.seed(1)
 dem.frequent.terms <- freq_terms(dem.docs,
            top= 50, 
           at.lease = 10,
@@ -279,14 +279,14 @@ rep.only <- setdiff(rep.frequent.terms$WORD,dem.frequent.terms$WORD)
 dem.only <- setdiff(dem.frequent.terms$WORD,rep.frequent.terms$WORD)
 dem.only <- dem.only[-c(7,12,8,11,15,17,18,27,28,29)]
 
+cat("Democratic: ",dem.only)
 
-cat("Republican: ",rep.only)
 ```
 
 ```{r,echo = FALSE}
-cat("Democratic: ",dem.only)
+cat("Republican: ",rep.only)
 ```
-It seems like presidents from different parties differ in philosophies. Presidents from the Democratic Party talk more about equality & health care, children land issues. Whereas presidents from the Republican party talks more about freedom, housing policies, state, and union. The findings matche two parties' long term ideology. 
+It seems like presidents from different parties differ in philosophies. Presidents from the Democratic Party talk more about equality, children, and land issues. Whereas presidents from the Republican party talks more about freedom, housing policies,and state. The findings matche two parties' long term ideologies. 
 
 
 
@@ -429,6 +429,7 @@ sentence.list=
 corpus.list=sentence.list[2:(nrow(sentence.list)-1), ]
 sentence.pre=sentence.list$sentences[1:(nrow(sentence.list)-2)]
 sentence.post=sentence.list$sentences[3:(nrow(sentence.list)-1)]
+
 corpus.list$snipets=paste(sentence.pre, corpus.list$sentences, sentence.post, sep=" ")
 rm.rows=(1:nrow(corpus.list))[corpus.list$sent.id==1]
 rm.rows=c(rm.rows, rm.rows-1)
@@ -443,6 +444,7 @@ docs <-tm_map(docs,content_transformer(tolower))
 docs <- tm_map(docs, removePunctuation)
 #Strip digits
 docs <- tm_map(docs, removeNumbers)
+
 #remove stopwords
 docs <- tm_map(docs, removeWords, stopwords("english"))
 #remove whitespace
